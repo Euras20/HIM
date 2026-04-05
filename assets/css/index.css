@@ -1563,7 +1563,7 @@
       background: linear-gradient(
         to bottom,
         var(--hero-overlay-start) 0%,
-        var(--hero-overlay-mid) 30%,
+        var(--hero-overlay-mid) 10%,
         var(--hero-overlay-end) 70%,
         var(--hero-overlay-end) 100%
       );
