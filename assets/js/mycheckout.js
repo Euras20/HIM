@@ -1,6 +1,6 @@
 // ========== CONFIGURATION ==========
   const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLGbw01mfT5K1v6hRGkvbmd3GP2Bd1oKs088reYvpQmLbRVsNb3EfwUIZ0MfCtfUlH/exec';
-  const FEDAPAY_PUBLIC_KEY = 'pk_live_Z9rTyZj0YpVSpl7cINJ2zy8b'
+  const FEDAPAY_PUBLIC_KEY = 'pk_live_n9bXkF_my6Ftf525CbMn4492'
   
   // Store FedaPay reference globally to avoid reference errors
   let FedaPayRef = null;
