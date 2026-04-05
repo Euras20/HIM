@@ -1,4 +1,4 @@
- // ========== CONFIGURATION ==========
+// ========== CONFIGURATION ==========
   const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLGbw01mfT5K1v6hRGkvbmd3GP2Bd1oKs088reYvpQmLbRVsNb3EfwUIZ0MfCtfUlH/exec';
   const FEDAPAY_PUBLIC_KEY = 'pk_live_Z9rTyZj0YpVSpl7cINJ2zy8b'
   
@@ -166,6 +166,9 @@
     formData.append('items', JSON.stringify(orderData.items));
     
     console.log('=== SAVING ORDER TO SHEET ===');
+    console.log('Order ID:', orderData.orderId);
+    console.log('Customer:', orderData.customer.fullName);
+    console.log('Total:', orderData.pricing.total);
     
     try {
       const response = await fetch(GOOGLE_SCRIPT_URL, {
@@ -185,7 +188,7 @@
 
   // ========== FEDAPAY INTEGRATION ==========
   let currentOrderData = null;
-  let paymentCompleted = false; // Track if payment was actually successful
+  let paymentCompleted = false;
   let fedapayWidget = null;
 
   function initFedaPay() {
@@ -204,7 +207,11 @@
       public_key: FEDAPAY_PUBLIC_KEY,
       transaction: {
         amount: currentOrderData.pricing.total,
-        description: `Commande HIM - ${currentOrderData.items.length} article(s)`
+        description: `Commande HIM - ${currentOrderData.items.length} article(s)`,
+        custom_metadata: {
+          order_id: currentOrderData.orderId,
+          customer_email: currentOrderData.customer.email
+        }
       },
       customer: {
         email: currentOrderData.customer.email,
@@ -212,58 +219,131 @@
         firstname: currentOrderData.customer.firstName,
         phone: currentOrderData.customer.phone
       },
+      currency: {
+        iso: 'XOF'
+      },
       container: '#fedapay-widget',
       
-      // Called when payment is SUCCESSFULLY COMPLETED
-      onComplete: async function(transaction) {
-  console.log('Payment completed:', transaction);
+      // Called when checkout is completed (payment processed, regardless of success/failure)
+      onComplete: async function(resp) {
+        console.log('=== FEDAPAY onComplete CALLED ===');
+        console.log('Response:', resp);
+        console.log('Reason:', resp.reason);
+        console.log('Transaction:', resp.transaction);
+        console.log('FedaPay.CHECKOUT_COMPLETED:', FedaPay.CHECKOUT_COMPLETED);
+        console.log('FedaPay.DIALOG_DISMISSED:', FedaPay.DIALOG_DISMISSED);
 
-  // 🔴 CRITICAL CHECK
-  if (!transaction || transaction.status !== "approved") {
-    console.log("Payment NOT approved → do nothing");
-    
-    document.getElementById('failedTitle').textContent = 'Paiement non validé';
-    document.getElementById('failedMessage').innerHTML = 'Le paiement n\'a pas été confirmé.<br>Veuillez réessayer.';
-    document.getElementById('failedModal').classList.add('active');
+        const FedaPay = window['FedaPay'];
 
-    return; // ⛔ STOP HERE
-  }
+        // Check if user closed the dialog without completing payment
+        if (resp.reason === FedaPay.DIALOG_DISMISSED) {
+          console.log('User dismissed the payment dialog');
+          paymentCompleted = false;
+          document.getElementById('failedTitle').textContent = 'Paiement annulé';
+          document.getElementById('failedMessage').innerHTML = 'Vous avez fermé la fenêtre de paiement.<br>Vous pouvez réessayer quand vous voulez.';
+          document.getElementById('failedModal').classList.add('active');
+          return;
+        }
 
-  // ✅ ONLY REAL SUCCESS CONTINUES
-  paymentCompleted = true;
+        // Check if checkout was completed
+        if (resp.reason === FedaPay.CHECKOUT_COMPLETED) {
+          console.log('Checkout completed, checking transaction status...');
+          
+          // Check if transaction exists and has status
+          if (!resp.transaction) {
+            console.error('No transaction object in response');
+            document.getElementById('failedTitle').textContent = 'Erreur de paiement';
+            document.getElementById('failedMessage').textContent = 'Impossible de vérifier le statut du paiement. Veuillez réessayer.';
+            document.getElementById('failedModal').classList.add('active');
+            return;
+          }
 
-  document.getElementById('loaderOverlay').classList.add('active');
+          const status = resp.transaction.status;
+          console.log('Transaction status:', status);
 
-  const saved = await saveOrderToSheet(currentOrderData);
+          // SUCCESS: Transaction approved
+          if (status === 'approved') {
+            console.log('✅ Payment APPROVED - showing success modal');
+            paymentCompleted = true;
 
-  document.getElementById('loaderOverlay').classList.remove('active');
+            // Show loader while saving
+            document.getElementById('loaderOverlay').classList.add('active');
 
-  if (saved) {
-    // success modal
-    document.getElementById('modalOrderId').innerText = currentOrderData.orderId;
-    document.getElementById('successModal').classList.add('active');
-  }
-},
-      
-      // Called when payment FAILS (error during processing)
-      onError: function(error) {
-        console.error('Payment error:', error);
-        paymentCompleted = false;
-        document.getElementById('failedTitle').textContent = 'Erreur de paiement';
-        document.getElementById('failedMessage').textContent = 'Une erreur est survenue lors du paiement.<br>Veuillez réessayer.';
+            // Save to Google Sheet
+            const saved = await saveOrderToSheet(currentOrderData);
+
+            // Hide loader
+            document.getElementById('loaderOverlay').classList.remove('active');
+
+            if (saved) {
+              console.log('✅ Order saved to sheet successfully');
+              // Show success modal
+              document.getElementById('modalOrderId').innerText = currentOrderData.orderId;
+              document.getElementById('successModal').classList.add('active');
+              
+              // Clear session storage
+              sessionStorage.removeItem('him_checkout_order');
+              localStorage.removeItem('him_temp_items');
+            } else {
+              console.error('❌ Failed to save order to sheet');
+              // Still show success modal but warn about sheet error
+              document.getElementById('modalOrderId').innerText = currentOrderData.orderId;
+              document.getElementById('successModal').classList.add('active');
+            }
+            return;
+          }
+
+          // FAILED: Transaction declined
+          if (status === 'declined') {
+            console.log('❌ Payment DECLINED');
+            paymentCompleted = false;
+            document.getElementById('failedTitle').textContent = 'Paiement refusé';
+            document.getElementById('failedMessage').innerHTML = 'Votre paiement a été refusé.<br>Veuillez vérifier vos informations et réessayer.';
+            document.getElementById('failedModal').classList.add('active');
+            return;
+          }
+
+          // CANCELLED: Transaction canceled
+          if (status === 'canceled') {
+            console.log('❌ Payment CANCELED');
+            paymentCompleted = false;
+            document.getElementById('failedTitle').textContent = 'Paiement annulé';
+            document.getElementById('failedMessage').innerHTML = 'Le paiement a été annulé.<br>Vous pouvez réessayer quand vous voulez.';
+            document.getElementById('failedModal').classList.add('active');
+            return;
+          }
+
+          // PENDING or other statuses
+          if (status === 'pending') {
+            console.log('⏳ Payment PENDING');
+            document.getElementById('failedTitle').textContent = 'Paiement en cours';
+            document.getElementById('failedMessage').innerHTML = 'Votre paiement est en cours de traitement.<br>Vous recevrez une confirmation par email.';
+            document.getElementById('failedModal').classList.add('active');
+            return;
+          }
+
+          // UNKNOWN status
+          console.log('❓ Unknown transaction status:', status);
+          document.getElementById('failedTitle').textContent = 'Statut inconnu';
+          document.getElementById('failedMessage').textContent = 'Statut du paiement: ' + status + '. Veuillez vérifier votre email.';
+          document.getElementById('failedModal').classList.add('active');
+          return;
+        }
+
+        // Fallback for any other reason
+        console.log('⚠️ Unhandled reason:', resp.reason);
+        document.getElementById('failedTitle').textContent = 'Paiement non complété';
+        document.getElementById('failedMessage').textContent = 'Le paiement n\'a pas été finalisé. Veuillez réessayer.';
         document.getElementById('failedModal').classList.add('active');
       },
       
-      // Called when user CANCELS or closes the widget
-      onCancel: function() {
-        console.log('Payment cancelled by user');
+      // Called when there's a technical error during payment processing
+      onError: function(error) {
+        console.error('=== FEDAPAY onError CALLED ===');
+        console.error('Error:', error);
         paymentCompleted = false;
-        
-        // DO NOT save to sheet - payment was cancelled
-        
-        // Show cancelled modal
-        document.getElementById('failedTitle').textContent = 'Paiement annulé';
-        document.getElementById('failedMessage').textContent = 'Vous avez annulé le paiement.<br>Vous pouvez réessayer quand vous voulez.';
+        document.getElementById('failedTitle').textContent = 'Erreur technique';
+        document.getElementById('failedMessage').innerHTML = 'Une erreur technique est survenue.<br>Détails: ' + (error.message || 'Erreur inconnue');
         document.getElementById('failedModal').classList.add('active');
       }
     });
@@ -302,6 +382,9 @@
     if (!currentOrderData.orderId) {
       currentOrderData.orderId = 'HIM-' + Date.now().toString().slice(-8);
     }
+    
+    // Update session storage with latest info
+    sessionStorage.setItem('him_checkout_order', JSON.stringify(currentOrderData));
     
     // Hide form, show FedaPay widget
     document.getElementById('checkoutForm').style.display = 'none';
