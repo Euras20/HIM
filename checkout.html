@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>HIM — Vérification & Paiement</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Jost:wght@200;300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/checkout.css">
+  <!-- FedaPay Checkout -->
+  <script src="https://cdn.fedapay.com/checkout.js?v=1.1.7"></script>
+</head>
+<body>
+
+<div class="custom-cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<header class="checkout-header">
+  <div class="logo-area">
+    <span class="logo-crown">♛</span>
+    <span class="logo-wordmark">HIM</span>
+    <span class="logo-sub">Only Fear — Confirmation</span>
+  </div>
+  <a href="index.html" class="back-link" id="backToOrder">← Modifier commande</a>
+</header>
+
+<div class="checkout-container">
+  <div class="review-card">
+    <div class="review-title">
+      Votre commande <span>Récapitulatif</span>
+    </div>
+    <div class="order-summary" id="orderSummaryContainer">
+      <div style="text-align:center; padding: 30px 0;">Chargement des informations...</div>
+    </div>
+    <div class="total-section" id="totalDisplay">
+      <span>Total à régler</span>
+      <span id="totalAmount">0 CFA</span>
+    </div>
+    <div class="secure-note" style="margin-top: 20px;">
+      <i class="ri-lock-line" style="font-size: 12px;"></i>
+      <span>Paiement 100% sécurisé</span>
+      <i class="ri-flashlight-line"></i>
+      <span>Confirmation sous 24h</span>
+    </div>
+  </div>
+
+  <div class="payment-card">
+    <div class="payment-title">
+      Finaliser le paiement
+    </div>
+    <div class="payment-sub" id="paymentStatusText">
+      Vérifiez vos coordonnées et validez pour afficher le paiement
+    </div>
+
+    <div id="errorMessage" class="error-message"></div>
+
+    <form id="checkoutForm">
+      <div class="row-2col">
+        <div class="form-group">
+          <label>PRÉNOM *</label>
+          <input type="text" id="firstName" placeholder="Jean" autocomplete="given-name">
+        </div>
+        <div class="form-group">
+          <label>NOM *</label>
+          <input type="text" id="lastName" placeholder="Dupont" autocomplete="family-name">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>EMAIL *</label>
+        <input type="email" id="emailAddress" placeholder="jean@exemple.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>TÉLÉPHONE</label>
+        <input type="tel" id="phoneNumber" placeholder="+33 6 00 00 00 00" autocomplete="tel">
+      </div>
+      <div class="form-group">
+        <label>ADRESSE DE LIVRAISON *</label>
+        <input type="text" id="deliveryAddress" placeholder="Numéro, rue, code postal, ville" autocomplete="address-line1">
+      </div>
+      <div class="form-group">
+        <label>NOTES (optionnel)</label>
+        <input type="text" id="orderNotes" placeholder="Instructions spéciales...">
+      </div>
+
+      <button type="button" class="confirm-btn" id="confirmBtn">
+        <i class="ri-check-line" style="font-size: 18px;"></i> Continuer vers le paiement
+      </button>
+    </form>
+
+    <!-- FedaPay Widget Container (hidden until form is valid) -->
+    <div id="fedapay-widget" style="display: none;"></div>
+  </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal-overlay" id="successModal">
+  <div class="modal-container">
+    <div class="modal-icon">
+      <i class="ri-checkbox-circle-fill" style="font-size: 56px; color: #7CB342;"></i>
+    </div>
+    <h3>Commande confirmée</h3>
+    <p>Votre paiement a été reçu.<br>Votre pièce HIM est en route.<br>Un email de confirmation vous a été envoyé.</p>
+    <div class="modal-order-id" id="modalOrderId">HIM-XXXXXX</div>
+    <button class="modal-btn" id="closeModalBtn">Retour à l'accueil</button>
+  </div>
+</div>
+
+<!-- Payment Failed/Abandoned Modal -->
+<div class="modal-overlay" id="failedModal">
+  <div class="modal-container">
+    <div class="modal-icon">
+      <i class="ri-close-circle-fill" style="font-size: 56px; color: #F44336;"></i>
+    </div>
+    <h3 id="failedTitle">Paiement non complété</h3>
+    <p id="failedMessage">Le paiement n'a pas été finalisé.<br>Vous pouvez réessayer ou modifier votre commande.</p>
+    <button class="modal-btn" id="retryBtn" style="background: #F44336;">Réessayer</button>
+    <button class="modal-btn" id="modifyBtn" style="background: #8A7E6A; margin-top: 10px;">Annuler</button>
+  </div>
+</div>
+
+<div class="loader-overlay" id="loaderOverlay">
+  <div class="spinner"></div>
+  <p style="color:#3E2E18; font-family: 'Jost', sans-serif; letter-spacing: 1px;">Finalisation de la commande...</p>
+</div>
+
+<script src="assets/js/mycheckout.js"></script>
+
+</body>
+</html>
