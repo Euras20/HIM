@@ -311,7 +311,7 @@
       }
 
       // Calculate total (12,000 CFA per piece based on your new pricing)
-      const PRICE_PER_PIECE = 12000;
+      const PRICE_PER_PIECE = 100;
       const total = items.length * PRICE_PER_PIECE;
 
       // Build order data object
